@@ -1,0 +1,109 @@
+"""
+ TUIA - Procesamiento de Imágenes I
+    TP2 - Problema 1A: Segmentación del área de la cinta transportadora (ROI)
+ 
+    Estrategia:
+ La imagen tiene una estructura vertical clara:
+    - Fondo superior / inferior oscuro
+    - Borde metálico superior (muy brillante, ~200 de gris)
+    - Línea de separación oscura (transición abrupta)
+    - CINTA (ROI): fondo oscuro ~60-90 con pastillas encima  <-- lo que queremos
+    - Línea de separación oscura (transición abrupta)
+    - Borde metálico inferior (brillante, ~165 de gris)
+    - Base / suelo
+ 
+  El algoritmo detecta automáticamente los límites verticales buscando
+  transiciones de luminosidad en el perfil de medias por fila.
+  La cinta ocupa prácticamente todo el ancho de la imagen.
+"""
+ 
+import cv2
+import numpy as np
+ 
+# ─── 1. CARGA ──────────────────────────────────────────────────────────────────
+IMAGE_PATH = '/mnt/user-data/uploads/pills.png'
+img = cv2.imread("NUEVO_TP/TP2/TP2-PDI-2026-UrielDuvia-LaureanoDiez/imagenes/pills.png")
+if img is None:
+    raise FileNotFoundError(f"No se pudo cargar la imagen: {IMAGE_PATH}")
+ 
+gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   # unidad: color
+h, w    = gray.shape
+print(f"[INFO] Imagen cargada: {w}x{h} px")
+ 
+# ─── 2. PERFIL DE LUMINOSIDAD POR FILA ────────────────────────────────────────
+# Media de intensidad por fila → vector 1D de shape (h,)
+row_means = np.mean(gray, axis=1).astype(np.float32)
+ 
+# Suavizamos el perfil con cv2.GaussianBlur aplicado al vector como imagen 1D
+# (lo tratamos como imagen de 1 fila de h columnas, kernel de tamaño impar)
+# unidad: Filtra_frecuencial / Transformacion y filtrado
+profile_2d = row_means.reshape(1, h)                          # shape (1, h)
+smoothed_2d = cv2.GaussianBlur(profile_2d, (1, 31), sigmaX=0) # kernel 1×31 sobre columnas
+smooth = smoothed_2d.reshape(h)                                # volver a 1D
+ 
+print(f"[INFO] Perfil de luminosidad calculado y suavizado ({h} filas)")
+ 
+# ─── 3. DETECCIÓN AUTOMÁTICA DE LÍMITES VERTICALES ────────────────────────────
+# Buscamos las dos transiciones principales:
+#   a) Fin del borde metálico superior → inicio de la cinta (brillante → oscuro)
+#   b) Fin de la cinta → inicio del borde metálico inferior (oscuro → brillante)
+ 
+BRIGHT_THRESH = 120   # umbral para considerar "zona brillante" (borde metálico)
+DARK_THRESH   = 50    # umbral para considerar "zona oscura" (línea de separación)
+ 
+belt_top    = None
+belt_bottom = None
+ 
+# Buscamos de arriba hacia abajo: primera fila que cae bajo DARK_THRESH
+# DESPUÉS de haber pasado por una zona brillante
+found_bright_top = False
+for r in range(h):
+    if smooth[r] > BRIGHT_THRESH:
+        found_bright_top = True
+    if found_bright_top and smooth[r] < DARK_THRESH:
+        # Avanzamos hasta que la cinta "empiece" (supere el mínimo oscuro)
+        # La cinta propiamente dicha empieza cuando vuelve a subir de ~20
+        for r2 in range(r, h):
+            if smooth[r2] > 30:
+                belt_top = r2
+                break
+        break
+ 
+# Buscamos de abajo hacia arriba: primera fila (desde abajo) que cae bajo DARK_THRESH
+# DESPUÉS de haber pasado por zona brillante (borde inferior)
+found_bright_bot = False
+for r in range(h - 1, -1, -1):
+    if smooth[r] > BRIGHT_THRESH:
+        found_bright_bot = True
+    if found_bright_bot and smooth[r] < DARK_THRESH:
+        # La cinta termina justo antes de esta transición oscura
+        for r2 in range(r, -1, -1):
+            if smooth[r2] > 30:
+                belt_bottom = r2
+                break
+        break
+ 
+# Fallback conservador si la detección falla
+if belt_top is None or belt_bottom is None or belt_top >= belt_bottom:
+    print("[WARN] Detección automática inconclusa, usando valores por defecto.")
+    belt_top    = 195
+    belt_bottom = 862
+ 
+print(f"[INFO] Límite superior de la cinta: fila {belt_top}")
+print(f"[INFO] Límite inferior de la cinta: fila {belt_bottom}")
+print(f"[INFO] Alto de la ROI: {belt_bottom - belt_top} px")
+print(f"[INFO] Ancho de la ROI: {w} px  (cinta ocupa todo el ancho)")
+ 
+# ─── 4. EXTRACCIÓN DE LA ROI ──────────────────────────────────────────────────
+roi = img[belt_top:belt_bottom, 0:w]
+ 
+print(f"[INFO] ROI extraída: {roi.shape[1]}x{roi.shape[0]} px")
+ 
+# ─── 6. GUARDAR LA ROI SOLA ───────────────────────────────────────────────────
+ROI_PATH    = 'cinta_roi.png'
+cv2.imwrite(ROI_PATH, roi)
+print(f"[OK] ROI guardada en: {ROI_PATH}")
+
+cv2.imshow('ROI - Cinta Transportadora', roi)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
