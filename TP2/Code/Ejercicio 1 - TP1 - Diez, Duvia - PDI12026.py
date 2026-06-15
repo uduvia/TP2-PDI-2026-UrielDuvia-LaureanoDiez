@@ -11,10 +11,7 @@
     - Línea de separación oscura (transición abrupta)
     - Borde metálico inferior (brillante, ~165 de gris)
     - Base / suelo
- 
-  El algoritmo detecta automáticamente los límites verticales buscando
-  transiciones de luminosidad en el perfil de medias por fila.
-  La cinta ocupa prácticamente todo el ancho de la imagen.
+
 """
  
 import cv2
@@ -113,11 +110,6 @@ for c in contours:
     mean_hsv = cv2.mean(roi_hsv, mask=cmask)
     H, S, V  = mean_hsv[0], mean_hsv[1], mean_hsv[2]
  
-    # ── FIX clave: contar píxeles azules en el BBOX completo ──────────────
-    # El contorno Otsu captura solo la mitad BLANCA de la cápsula azul/blanca.
-    # La parte azul (más oscura) queda fuera del contorno → si usáramos cmask
-    # tendríamos muy pocos píxeles azules y la cápsula no se clasificaría bien.
-    # Usando el bbox obtenemos toda la región de la pastilla.
     blue_px = cv2.countNonZero(blue_global[y:y+bh, x:x+bw])
  
     # ── Reglas de clasificación ───────────────────────────────────────────
@@ -225,9 +217,7 @@ for tipo, nombre in nombres.items():
                     (30, leyenda_y), FONT, 0.38, (255,255,255), 1)
         leyenda_y += 22
  
-OUTPUT_PATH = 'resultado_pastillas.png'
-cv2.imwrite(OUTPUT_PATH, result)
-print(f"\n[OK] Imagen resultado guardada en: {OUTPUT_PATH}")
+
  
 cv2.imshow('Resultado - Deteccion y Clasificacion', result)
 cv2.waitKey(0)
