@@ -18,8 +18,8 @@ import cv2
 import numpy as np
  
 # ─── 1. CARGA ──────────────────────────────────────────────────────────────────
-
-img = cv2.imread("NUEVO_TP/TP2/TP2-PDI-2026-UrielDuvia-LaureanoDiez/TP2/imagenes/pills.png")
+IMAGE_PATH="imagenes\pills.png"
+img = cv2.imread(IMAGE_PATH)
 if img is None:
     raise FileNotFoundError(f"No se pudo cargar la imagen: {IMAGE_PATH}")
  
@@ -52,8 +52,6 @@ for r in range(h_img - 1, -1, -1):
             if smooth[r2] > 30: belt_bottom = r2; break
         break
  
-if belt_top is None or belt_bottom is None:
-    belt_top, belt_bottom = 157, 873
  
 roi      = img[belt_top:belt_bottom, 0:w_img]
 roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)    # Color
@@ -80,13 +78,13 @@ contours_raw, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIM
 MIN_AREA = 100
 contours = [c for c in contours_raw if cv2.contourArea(c) > MIN_AREA]
 print(f"[INFO] Contornos: {len(contours_raw)} totales → {len(contours)} válidos (área > {MIN_AREA})")
- 
+
 # ─── 7. CLASIFICACIÓN ─────────────────────────────────────────────────────────
 # Máscara global de color azul (para CAB)
 BLUE_LO = np.array([95,  60,  60])
 BLUE_HI = np.array([135, 255, 255])
 blue_global = cv2.inRange(roi_hsv, BLUE_LO, BLUE_HI)   # Segmentacion (inRange)
- 
+
 pills = []
  
 for c in contours:
